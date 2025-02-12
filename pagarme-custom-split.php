@@ -18,51 +18,42 @@ class Pagarme_Custom_Split_Plugin {
     public function __construct() {
         // Registra o autoloader personalizado
         spl_autoload_register(array($this, 'custom_pagarme_order_autoload'), true, true);
+
+        // Adiciona o filtro personalizado para o split
+        // add_filter('do_split_order', array($this, 'custom_pagarme_do_split_order'), 10, 3);
     }
 
     public function custom_pagarme_order_autoload($class) {
         if ($class === 'Pagarme\Core\Payment\Aggregates\Order') {
-            class Custom_Pagarme_Order_Wrapper {
-                private $originalOrder;
-
-                public function __construct() {
-                    $this->originalOrder = new \Pagarme\Core\Payment\Aggregates\Order();
-                }
-
-                public function __call($method, $arguments) {
-                    if ($method === 'convertToSDKRequest') {
-                        return $this->customConvertToSDKRequest();
-                    }
-                    return call_user_func_array([$this->originalOrder, $method], $arguments);
-                }
-
-                private function customConvertToSDKRequest() {
-                    $orderRequest = $this->originalOrder->convertToSDKRequest();
-
-                    if (!empty($this->originalOrder->getSplitData())) {
-                        $splitData = $this->originalOrder->getSplitData();
-                        
-                        global $wp_filter;
-                        if (isset($wp_filter['do_split_order'])) {
-                            $orderRequest = apply_filters('do_split_order', $orderRequest, $splitData, $this->originalOrder);
-                        }
-                    }
-
-                    return $orderRequest;
-                }
-
-                public function __get($name) {
-                    return $this->originalOrder->$name;
-                }
-
-                public function __set($name, $value) {
-                    $this->originalOrder->$name = $value;
-                }
-            }
-
+            require_once __DIR__ . '/includes/class-custom-pagarme-order-wrapper.php';
             class_alias('Custom_Pagarme_Order_Wrapper', $class);
         }
     }
+
+    // public function custom_pagarme_do_split_order($orderRequest, $splitData, $order) {
+    //     foreach ($orderRequest->payments as $key => $paymentObject) {
+    //         $split = [];    
+    //         $sellerCount = count($splitData->getSellersData());
+            
+    //         foreach ($splitData->getSellersData() as $index => $sellerData) {
+    //             $isLastSeller = ($index === $sellerCount - 1);
+                
+    //             $split[] = [
+    //                 "amount" => $sellerData['commission'],
+    //                 "recipient_id" => $sellerData['pagarmeId'],
+    //                 "type" => "flat",
+    //                 "options" => [
+    //                     "charge_processing_fee" => true,
+    //                     "charge_remainder_fee" => $isLastSeller,
+    //                     "liable" => true
+    //                 ]
+    //             ];
+    //         }
+    //         $paymentObject->split = $split;
+    //     }
+
+    //     return $orderRequest;
+    // }
 }
 
 // Initialize the plugin
